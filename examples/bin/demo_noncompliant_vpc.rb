@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 
-require 'cfndsl'
 require 'aws-sdk'
 require 'inspec'
 require 'inspec/aws'
@@ -8,9 +7,7 @@ require 'inspec/aws'
 ENV['AWS_REGION'] = 'us-west-2'
 
 examples_home = File.dirname(__FILE__)+'/..'
-
-#Create a new VPC with some failures
-template_body = CfnDsl::eval_file_with_extras("#{examples_home}/noncompliant_vpc_cfndsl.rb",[],false).to_json
+template_body = File.read(File.join(examples_home,'noncompliant_vpc.json'))
 
 cfn_client = Aws::CloudFormation::Client.new
 cfn_resource = Aws::CloudFormation::Resource.new(client: cfn_client)
@@ -43,12 +40,15 @@ ENV['vpc_id'] = vpc_id
 begin
   puts "Running Inspec on example profile..."
   o = {}
+  o[:log_format] = 'json'
   o[:logger] = Logger.new(STDOUT)
-  o[:logger].level = 'info'
 
   runner = Inspec::Runner.new(o)
-  runner.add_tests(["#{examples_home}/profile"])
+  profile = Inspec::Profile.for_target(File.join(examples_home, './profile'),{})
+  runner.add_profile(profile)
   runner.run
+  # print JSON.pretty_generate(runner.report)
+
 ensure
   puts "Deleting stack #{stack_name}"
   stack.delete
